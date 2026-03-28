@@ -1,0 +1,6 @@
+backend/__pycache__/
+backend/*.pyc
+backend/node_modules/
+backend/chunks2/
+backend/build_log.txt
+backend/harvest_log.txt
