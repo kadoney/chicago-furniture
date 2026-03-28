@@ -1,0 +1,9 @@
+name = "chicago-collection"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+account_id = "ebe622eaa5b3a3581cf5664272f26f30"
+
+[[d1_databases]]
+binding = "AIC_DB"
+database_name = "chicago-furniture"
+database_id = "b54696a6-8571-4633-8247-dfa4827e89f8"

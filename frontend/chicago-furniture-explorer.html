@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Art Institute of Chicago — Furniture Explorer — SAPFM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+/* ── Design tokens ─────────────────────────────────────────────────────── */
+:root {
+  --cream:      #faf7f2;
+  --parchment:  #f3ede0;
+  --parchment2: #ede3ce;
+  --walnut:     #3a2518;
+  --walnut-mid: #3a2010;
+  --walnut-lt:  #5a3820;
+  --gilt:       #8a6500;
+  --gilt-lt:    #c9a03a;
+  --gilt-pale:  #f0e4b8;
+  --ink:        #1a1008;
+  --muted:      #3d2a1c;
+  --border:     #d4c4a8;
+  --border-lt:  #e8dcc8;
+  --sidebar-w:  300px;
+  --header-h:   56px;
+  --radius:     3px;
+  --shadow-card:  0 1px 4px rgba(58,37,24,.10), 0 4px 16px rgba(58,37,24,.06);
+  --shadow-panel: -4px 0 24px rgba(58,37,24,.12);
+  --transition:   180ms ease;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 17px; }
+body {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  background: var(--cream);
+  color: var(--ink);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Grain overlay */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  opacity: .018;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ── Header ────────────────────────────────────────────────────────────── */
+#header {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: var(--header-h);
+  background: var(--walnut);
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 24px;
+  z-index: 200;
+  border-bottom: 1px solid rgba(168,124,16,.3);
+}
+#header h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.15rem; font-weight: 400;
+  color: var(--gilt-lt);
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+#header .subtitle {
+  font-family: 'DM Mono', monospace;
+  font-size: .68rem;
+  color: #c4ad96;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  border-left: 1px solid rgba(255,255,255,.15);
+  padding-left: 16px;
+  white-space: nowrap;
+}
+#object-count {
+  font-family: 'DM Mono', monospace;
+  font-size: .7rem;
+  color: var(--gilt);
+  margin-left: auto;
+  letter-spacing: .06em;
+}
+
+/* ── Layout ────────────────────────────────────────────────────────────── */
+#layout {
+  display: flex;
+  margin-top: var(--header-h);
+  min-height: calc(100vh - var(--header-h));
+}
+
+/* ── Sidebar ───────────────────────────────────────────────────────────── */
+#sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--parchment);
+  border-right: 1px solid var(--border);
+  padding: 24px 20px;
+  position: sticky;
+  top: var(--header-h);
+  height: calc(100vh - var(--header-h));
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+#sidebar::-webkit-scrollbar { width: 4px; }
+#sidebar::-webkit-scrollbar-track { background: transparent; }
+#sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.sidebar-section { display: flex; flex-direction: column; gap: 10px; }
+.sidebar-label {
+  font-family: 'DM Mono', monospace;
+  font-size: .72rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--walnut-mid);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-lt);
+}
+
+#search-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--cream);
+  font-family: 'Cormorant Garamond', serif;
+  font-size: .95rem;
+  color: var(--ink);
+  outline: none;
+  transition: border-color var(--transition);
+}
+#search-input:focus { border-color: var(--gilt); }
+#search-input::placeholder { color: var(--walnut-lt); font-style: italic; }
+
+/* Form chips */
+.chip-group { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip {
+  font-family: 'DM Mono', monospace;
+  font-size: .73rem;
+  letter-spacing: .05em;
+  padding: 6px 11px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--cream);
+  color: var(--walnut-mid);
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.chip:hover { border-color: var(--walnut-lt); color: var(--walnut); }
+.chip.active { background: var(--walnut); border-color: var(--walnut); color: var(--gilt-lt); }
+
+/* Date range */
+.date-row { display: flex; gap: 8px; align-items: center; }
+.date-input {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--cream);
+  font-family: 'DM Mono', monospace;
+  font-size: .75rem;
+  color: var(--ink);
+  outline: none;
+  transition: border-color var(--transition);
+}
+.date-input:focus { border-color: var(--gilt); }
+.date-sep { font-family: 'DM Mono', monospace; font-size: .7rem; color: var(--muted); }
+
+/* Period presets */
+#period-presets { display: flex; flex-wrap: wrap; gap: 4px; }
+.preset {
+  font-family: 'DM Mono', monospace;
+  font-size: .67rem;
+  letter-spacing: .04em;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.preset:hover { border-color: var(--gilt); color: var(--walnut); }
+.preset.active { background: var(--gilt-pale); border-color: var(--gilt); color: var(--walnut); font-weight: 500; }
+
+/* Selects */
+#origin-select, #dept-select, #sort-select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--cream);
+  font-family: 'DM Mono', monospace;
+  font-size: .7rem;
+  color: var(--ink);
+  outline: none;
+  cursor: pointer;
+}
+
+/* Reset */
+#reset-btn {
+  width: 100%;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  font-family: 'DM Mono', monospace;
+  font-size: .65rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all var(--transition);
+  margin-top: auto;
+}
+#reset-btn:hover { border-color: var(--walnut-lt); color: var(--walnut); }
+
+/* ── Main / Grid ───────────────────────────────────────────────────────── */
+#main { flex: 1; padding: 24px; min-width: 0; }
+#grid { columns: 5 220px; column-gap: 16px; }
+@media (max-width: 1400px) { #grid { columns: 4 200px; } }
+@media (max-width: 1100px) { #grid { columns: 3 200px; } }
+@media (max-width: 780px)  { #grid { columns: 2 180px; } }
+@media (max-width: 500px)  { #grid { columns: 1; } }
+
+/* ── Card ──────────────────────────────────────────────────────────────── */
+.card {
+  break-inside: avoid;
+  margin-bottom: 16px;
+  background: white;
+  border: 1px solid var(--border-lt);
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+  transition: transform var(--transition), box-shadow var(--transition);
+  animation: fadeUp .3s ease both;
+}
+.card:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(58,37,24,.14); }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.card-img-wrap { width: 100%; background: var(--parchment); overflow: hidden; }
+.card-img-wrap img { width: 100%; height: auto; display: block; transition: opacity .3s ease; }
+.card-img-wrap .img-placeholder {
+  width: 100%; aspect-ratio: 3/4;
+  background: linear-gradient(135deg, var(--parchment) 0%, var(--parchment2) 100%);
+  display: flex; align-items: center; justify-content: center;
+}
+.card-img-wrap .img-placeholder svg { width: 32px; height: 32px; opacity: .25; }
+
+.card-body { padding: 12px 14px 14px; }
+.card-title {
+  font-family: 'Playfair Display', serif;
+  font-size: .92rem; font-weight: 400;
+  color: var(--ink); line-height: 1.35; margin-bottom: 5px;
+}
+.card-meta { font-family: 'DM Mono', monospace; font-size: .73rem; color: var(--muted); line-height: 1.6; }
+.card-maker { font-family: 'Cormorant Garamond', serif; font-size: .82rem; font-style: italic; color: var(--walnut-mid); margin-bottom: 3px; }
+.card-origin { font-family: 'DM Mono', monospace; font-size: .66rem; color: var(--gilt); letter-spacing: .04em; }
+
+/* ── Shimmer ───────────────────────────────────────────────────────────── */
+.shimmer { break-inside: avoid; margin-bottom: 16px; border-radius: var(--radius); overflow: hidden; background: var(--parchment); }
+.shimmer-img { width: 100%; aspect-ratio: 3/4; background: linear-gradient(90deg, var(--parchment) 25%, var(--parchment2) 50%, var(--parchment) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+.shimmer-body { padding: 12px 14px; }
+.shimmer-line { height: 10px; border-radius: 2px; background: linear-gradient(90deg, var(--parchment) 25%, var(--parchment2) 50%, var(--parchment) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; margin-bottom: 7px; }
+.shimmer-line.short { width: 60%; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* ── Pagination ────────────────────────────────────────────────────────── */
+#load-more-wrap { display: flex; justify-content: center; padding: 24px 0 40px; }
+#load-more-btn {
+  font-family: 'DM Mono', monospace; font-size: .68rem; letter-spacing: .1em; text-transform: uppercase;
+  padding: 10px 28px; border: 1px solid var(--walnut-lt); border-radius: var(--radius);
+  background: transparent; color: var(--walnut-mid); cursor: pointer; transition: all var(--transition);
+}
+#load-more-btn:hover { background: var(--walnut); color: var(--gilt-lt); border-color: var(--walnut); }
+#load-more-btn:disabled { opacity: .4; cursor: default; }
+#end-marker { font-family: 'DM Mono', monospace; font-size: .70rem; color: var(--muted); letter-spacing: .08em; text-align: center; padding: 24px 0 40px; }
+
+/* ── Empty state ───────────────────────────────────────────────────────── */
+#empty-state { padding: 80px 24px; text-align: center; display: none; }
+#empty-state h2 { font-family: 'Playfair Display', serif; font-size: 1.4rem; font-weight: 400; color: var(--walnut-mid); margin-bottom: 10px; }
+#empty-state p { font-size: .95rem; color: var(--muted); font-style: italic; }
+
+/* ── Detail panel ──────────────────────────────────────────────────────── */
+#detail-panel {
+  position: fixed; top: var(--header-h); right: 0; bottom: 0;
+  width: 520px;
+  background: var(--cream); border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-panel);
+  transform: translateX(100%); transition: transform .3s cubic-bezier(.4,0,.2,1);
+  z-index: 100; display: flex; flex-direction: column; overflow: hidden;
+}
+#detail-panel.open { transform: translateX(0); }
+
+#detail-close {
+  position: absolute; top: 12px; right: 12px;
+  width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 50%;
+  background: rgba(250,247,242,.85); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: 1.1rem; transition: all var(--transition); z-index: 10;
+}
+#detail-close:hover { border-color: var(--walnut-lt); color: var(--walnut); }
+
+#detail-scroll { flex: 1; overflow-y: auto; }
+#detail-scroll::-webkit-scrollbar { width: 4px; }
+#detail-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+#detail-img-wrap {
+  width: 100%; background: var(--parchment);
+  display: flex; align-items: center; justify-content: center;
+  min-height: 200px; flex-shrink: 0;
+}
+#detail-img { width: 100%; max-height: 50vh; object-fit: contain; display: block; cursor: pointer; }
+#detail-img:hover { opacity: .9; }
+
+#detail-body { padding: 20px 24px; }
+
+#detail-footer {
+  flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+  padding: 10px 16px; border-top: 1px solid var(--border); background: var(--parchment);
+}
+#detail-footer-link {
+  font-family: 'DM Mono', monospace; font-size: .65rem; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--gilt); text-decoration: none; border: 1px solid var(--gilt);
+  border-radius: var(--radius); padding: 7px 12px; transition: all var(--transition); white-space: nowrap;
+}
+#detail-footer-link:hover { background: var(--gilt-pale); color: var(--walnut); }
+#detail-footer-close {
+  width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 50%;
+  background: var(--cream); cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: .9rem; transition: all var(--transition); flex-shrink: 0;
+}
+#detail-footer-close:hover { border-color: var(--walnut-lt); color: var(--walnut); }
+
+#detail-title { font-family: 'Playfair Display', serif; font-size: 1.3rem; font-weight: 400; line-height: 1.3; color: var(--ink); margin-bottom: 4px; }
+#detail-maker { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 1.05rem; color: var(--ink); margin-bottom: 16px; }
+
+.detail-section { border-top: 1px solid var(--border-lt); padding-top: 14px; margin-top: 14px; }
+.detail-field { display: grid; grid-template-columns: 110px 1fr; gap: 4px 10px; margin-bottom: 8px; font-size: .88rem; }
+.detail-field-label { font-family: 'DM Mono', monospace; font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink); padding-top: 2px; opacity: .6; }
+.detail-field-value { font-family: 'Cormorant Garamond', serif; color: var(--ink); line-height: 1.5; font-size: .92rem; }
+
+.detail-description { font-family: 'Cormorant Garamond', serif; font-size: .95rem; color: var(--ink); line-height: 1.7; border-top: 1px solid var(--border-lt); padding-top: 14px; margin-top: 14px; }
+
+/* ── Overlay ───────────────────────────────────────────────────────────── */
+#overlay { display: none; position: fixed; inset: 0; background: rgba(30,20,10,.4); z-index: 99; backdrop-filter: blur(1px); }
+#overlay.visible { display: block; }
+
+/* ── Mobile ────────────────────────────────────────────────────────────── */
+@media (max-width: 780px) {
+  #sidebar { display: none; }
+  #detail-panel { width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<header id="header">
+  <h1>Art Institute of Chicago — Furniture</h1>
+  <span class="subtitle">SAPFM Research Tool · Chicago, Illinois</span>
+  <span id="object-count">—</span>
+</header>
+
+<div id="layout">
+
+  <aside id="sidebar">
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Search</div>
+      <input id="search-input" type="text" placeholder="Title, maker, or material…" autocomplete="off">
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Form</div>
+      <div id="form-chips" class="chip-group">
+        <button class="chip active" data-form="">All</button>
+        <button class="chip" data-form="Chair">Chairs</button>
+        <button class="chip" data-form="Table">Tables</button>
+        <button class="chip" data-form="Case Piece">Case Pieces</button>
+        <button class="chip" data-form="Desk">Desks</button>
+        <button class="chip" data-form="Sofa & Bench">Sofas</button>
+        <button class="chip" data-form="Stand">Stands</button>
+        <button class="chip" data-form="Clock">Clocks</button>
+        <button class="chip" data-form="Bed">Beds</button>
+        <button class="chip" data-form="Mirror">Mirrors</button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Department</div>
+      <select id="dept-select">
+        <option value="">All departments</option>
+        <option value="Arts of the Americas">Arts of the Americas</option>
+        <option value="Applied Arts of Europe">Applied Arts of Europe</option>
+      </select>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Origin</div>
+      <select id="origin-select">
+        <option value="">All origins</option>
+      </select>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Date Range</div>
+      <div class="date-row">
+        <input class="date-input" id="date-from" type="number" placeholder="From" min="1600" max="1950">
+        <span class="date-sep">–</span>
+        <input class="date-input" id="date-to" type="number" placeholder="To" min="1600" max="1950">
+      </div>
+      <div id="period-presets">
+        <button class="preset" data-from="1600" data-to="1730">Colonial</button>
+        <button class="preset" data-from="1720" data-to="1790">Georgian</button>
+        <button class="preset" data-from="1790" data-to="1830">Federal</button>
+        <button class="preset" data-from="1830" data-to="1870">Empire</button>
+        <button class="preset" data-from="1840" data-to="1900">Victorian</button>
+        <button class="preset" data-from="1880" data-to="1920">Arts & Crafts</button>
+        <button class="preset" data-from="1890" data-to="1940">Art Nouveau</button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Sort</div>
+      <select id="sort-select">
+        <option value="date_asc">Date — earliest first</option>
+        <option value="date_desc">Date — latest first</option>
+        <option value="title_asc">Title — A to Z</option>
+      </select>
+    </div>
+
+    <button id="reset-btn">Reset all filters</button>
+
+  </aside>
+
+  <main id="main">
+    <div id="grid"></div>
+    <div id="empty-state">
+      <h2>No objects found</h2>
+      <p>Try adjusting the filters or broadening the date range.</p>
+    </div>
+    <div id="load-more-wrap" style="display:none">
+      <button id="load-more-btn">Load more</button>
+    </div>
+    <div id="end-marker" style="display:none">— end of collection —</div>
+  </main>
+
+</div>
+
+<div id="overlay"></div>
+
+<div id="detail-panel">
+  <button id="detail-close">✕</button>
+  <div id="detail-scroll">
+    <div id="detail-img-wrap">
+      <img id="detail-img" src="" alt="" style="display:none">
+    </div>
+    <div id="detail-body">
+      <div id="detail-title"></div>
+      <div id="detail-maker"></div>
+      <div class="detail-section">
+        <div class="detail-field"><span class="detail-field-label">Date</span><span class="detail-field-value" id="df-date"></span></div>
+        <div class="detail-field"><span class="detail-field-label">Form</span><span class="detail-field-value" id="df-form"></span></div>
+        <div class="detail-field"><span class="detail-field-label">Origin</span><span class="detail-field-value" id="df-origin"></span></div>
+        <div class="detail-field"><span class="detail-field-label">Materials</span><span class="detail-field-value" id="df-medium"></span></div>
+        <div class="detail-field"><span class="detail-field-label">Dimensions</span><span class="detail-field-value" id="df-dims"></span></div>
+        <div class="detail-field"><span class="detail-field-label">Department</span><span class="detail-field-value" id="df-dept"></span></div>
+        <div class="detail-field"><span class="detail-field-label">Accession</span><span class="detail-field-value" id="df-accession"></span></div>
+        <div class="detail-field"><span class="detail-field-label">Credit</span><span class="detail-field-value" id="df-credit"></span></div>
+      </div>
+    </div>
+  </div>
+  <div id="detail-footer">
+    <a id="detail-footer-link" href="#" target="_blank" rel="noopener">View at Art Institute of Chicago ↗</a>
+    <button id="detail-footer-close" title="Close">✕</button>
+  </div>
+</div>
+
+<script>
+const WORKER    = 'https://chicago-collection.sapfm-admin.workers.dev';
+const PAGE_SIZE = 50;
+
+const state = {
+  q: '', form: '', origin: '', dept: '',
+  dateFrom: '', dateTo: '',
+  sort: 'date_asc',
+  offset: 0, total: 0, loading: false,
+};
+
+const grid         = document.getElementById('grid');
+const emptyState   = document.getElementById('empty-state');
+const countEl      = document.getElementById('object-count');
+const loadMoreWrap = document.getElementById('load-more-wrap');
+const loadMoreBtn  = document.getElementById('load-more-btn');
+const endMarker    = document.getElementById('end-marker');
+const overlay      = document.getElementById('overlay');
+const panel        = document.getElementById('detail-panel');
+
+// ── Load origin dropdown from /counts ────────────────────────────────────────
+async function loadOrigins() {
+  try {
+    const res  = await fetch(`${WORKER}/counts`);
+    const data = await res.json();
+    const sel  = document.getElementById('origin-select');
+    const origins = Object.entries(data.by_origin || {}).sort((a, b) => b[1] - a[1]);
+    origins.forEach(([origin, count]) => {
+      const opt = document.createElement('option');
+      opt.value = origin;
+      opt.textContent = `${origin} (${count})`;
+      sel.appendChild(opt);
+    });
+  } catch (err) {
+    console.error('Failed to load origins:', err);
+  }
+}
+
+// ── Throttled image loading ──────────────────────────────────────────────────
+const thumbQueue = [];
+let   thumbActive = 0;
+const THUMB_MAX = 8;
+const THUMB_GAP = 30;
+
+function enqueueThumb(img, url) {
+  thumbQueue.push({ img, url });
+  drainQueue();
+}
+function drainQueue() {
+  while (thumbActive < THUMB_MAX && thumbQueue.length) {
+    const { img, url } = thumbQueue.shift();
+    thumbActive++;
+    const loader = new Image();
+    loader.onload = loader.onerror = () => {
+      thumbActive--;
+      if (loader.naturalWidth) { img.src = url; img.style.opacity = '1'; }
+      setTimeout(drainQueue, THUMB_GAP);
+    };
+    loader.src = url;
+  }
+}
+
+// ── Build URL ────────────────────────────────────────────────────────────────
+function buildUrl() {
+  const p = new URLSearchParams();
+  if (state.form)     p.set('form',       state.form);
+  if (state.origin)   p.set('origin',     state.origin);
+  if (state.dept)     p.set('department', state.dept);
+  if (state.dateFrom) p.set('date_from',  state.dateFrom);
+  if (state.dateTo)   p.set('date_to',    state.dateTo);
+  if (state.q)        p.set('q',          state.q);
+  p.set('limit',  String(PAGE_SIZE));
+  p.set('offset', String(state.offset));
+  return `${WORKER}/search?${p}`;
+}
+
+// ── Fetch & render ───────────────────────────────────────────────────────────
+async function fetchAndRender(append = false) {
+  if (state.loading) return;
+  state.loading = true;
+
+  if (!append) {
+    thumbQueue.length = 0;
+    state.offset = 0;
+    grid.innerHTML = '';
+    renderShimmers(8);
+    loadMoreWrap.style.display = 'none';
+    endMarker.style.display    = 'none';
+    emptyState.style.display   = 'none';
+  }
+
+  try {
+    const res  = await fetch(buildUrl());
+    const data = await res.json();
+    state.total = data.total ?? 0;
+
+    if (!append) grid.innerHTML = '';
+
+    if (state.total === 0) {
+      emptyState.style.display = 'block';
+      countEl.textContent = '0 objects';
+    } else {
+      emptyState.style.display = 'none';
+      countEl.textContent = `${state.total.toLocaleString()} object${state.total === 1 ? '' : 's'}`;
+      renderCards(data.results ?? [], append);
+    }
+
+    state.offset += (data.results ?? []).length;
+    updatePagination();
+  } catch (err) {
+    if (!append) grid.innerHTML = `<p style="color:var(--muted);padding:40px;font-style:italic">Failed to load — is the worker deployed?</p>`;
+    console.error(err);
+  }
+
+  state.loading = false;
+}
+
+function renderShimmers(n) {
+  for (let i = 0; i < n; i++) {
+    const s = document.createElement('div');
+    s.className = 'shimmer';
+    s.innerHTML = `<div class="shimmer-img"></div><div class="shimmer-body"><div class="shimmer-line"></div><div class="shimmer-line short"></div></div>`;
+    grid.appendChild(s);
+  }
+}
+
+function renderCards(results, append) {
+  if (!append) grid.innerHTML = '';
+  const sorted = sortResults([...results]);
+
+  sorted.forEach((obj, i) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.animationDelay = `${Math.min(i, 12) * 30}ms`;
+
+    const thumbUrl = obj.image_thumb_url;
+    const imgHtml = thumbUrl
+      ? `<div class="card-img-wrap"><img src="" alt="${esc(obj.alt_text || obj.title)}" style="opacity:0" loading="lazy"></div>`
+      : `<div class="card-img-wrap"><div class="img-placeholder">${chairIcon()}</div></div>`;
+
+    card.innerHTML = `
+      ${imgHtml}
+      <div class="card-body">
+        ${obj.maker_name ? `<div class="card-maker">${esc(obj.maker_name)}</div>` : ''}
+        <div class="card-title">${esc(obj.title)}</div>
+        <div class="card-meta">
+          ${obj.date_display ? esc(obj.date_display) : ''}
+          ${obj.form_type ? ` · ${esc(obj.form_type)}` : ''}
+        </div>
+        ${obj.origin ? `<div class="card-origin">${esc(obj.origin)}</div>` : ''}
+      </div>`;
+
+    if (thumbUrl) {
+      const img = card.querySelector('img');
+      enqueueThumb(img, thumbUrl);
+    }
+
+    card.addEventListener('click', () => openDetail(obj));
+    grid.appendChild(card);
+  });
+}
+
+function sortResults(arr) {
+  switch (state.sort) {
+    case 'date_desc': return arr.sort((a,b) => (b.date_begin ?? 9999) - (a.date_begin ?? 9999));
+    case 'title_asc': return arr.sort((a,b) => (a.title||'').localeCompare(b.title||''));
+    default:          return arr.sort((a,b) => (a.date_begin ?? 9999) - (b.date_begin ?? 9999));
+  }
+}
+
+function updatePagination() {
+  const remaining = state.total - state.offset;
+  if (remaining > 0) {
+    loadMoreWrap.style.display = 'flex';
+    endMarker.style.display    = 'none';
+    loadMoreBtn.textContent    = `Load more (${remaining.toLocaleString()} remaining)`;
+    loadMoreBtn.disabled       = false;
+  } else {
+    loadMoreWrap.style.display = 'none';
+    if (state.total > 0) endMarker.style.display = 'block';
+  }
+}
+
+// ── Detail panel ─────────────────────────────────────────────────────────────
+function openDetail(obj) {
+  document.getElementById('detail-title').textContent = obj.title || '—';
+  document.getElementById('detail-maker').textContent = obj.maker_display || obj.maker_name || '';
+
+  document.getElementById('df-date').textContent      = obj.date_display || '—';
+  document.getElementById('df-form').textContent      = [obj.form_bucket, obj.form_type].filter(Boolean).join(' · ') || '—';
+  document.getElementById('df-origin').textContent    = obj.place || obj.origin || '—';
+  document.getElementById('df-medium').textContent    = obj.medium || '—';
+  document.getElementById('df-dims').textContent      = obj.dimensions || '—';
+  document.getElementById('df-dept').textContent      = obj.department || '—';
+  document.getElementById('df-accession').textContent = obj.accession || '—';
+  document.getElementById('df-credit').textContent    = obj.creditline || '—';
+
+  document.getElementById('detail-footer-link').href = obj.collection_url || '#';
+
+  const img = document.getElementById('detail-img');
+  if (obj.image_full_url) {
+    img.src = obj.image_full_url;
+    img.alt = obj.alt_text || obj.title || '';
+    img.style.display = 'block';
+  } else {
+    img.style.display = 'none';
+  }
+
+  document.getElementById('detail-scroll').scrollTop = 0;
+  panel.classList.add('open');
+  overlay.classList.add('visible');
+}
+
+function closeDetail() {
+  panel.classList.remove('open');
+  overlay.classList.remove('visible');
+}
+
+// ── Utilities ────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function chairIcon() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+    <path d="M6 20V12M18 20V12M4 12h16M8 12V6a4 4 0 018 0v6"/>
+  </svg>`;
+}
+
+// ── Event listeners ──────────────────────────────────────────────────────────
+let searchTimer;
+document.getElementById('search-input').addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => { state.q = e.target.value.trim(); fetchAndRender(); }, 400);
+});
+
+document.getElementById('form-chips').addEventListener('click', e => {
+  const btn = e.target.closest('.chip');
+  if (!btn) return;
+  document.querySelectorAll('#form-chips .chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  state.form = btn.dataset.form;
+  fetchAndRender();
+});
+
+document.getElementById('dept-select').addEventListener('change', e => {
+  state.dept = e.target.value;
+  fetchAndRender();
+});
+
+document.getElementById('origin-select').addEventListener('change', e => {
+  state.origin = e.target.value;
+  fetchAndRender();
+});
+
+let dateTimer;
+function onDateChange() {
+  clearTimeout(dateTimer);
+  dateTimer = setTimeout(() => {
+    state.dateFrom = document.getElementById('date-from').value.trim();
+    state.dateTo   = document.getElementById('date-to').value.trim();
+    fetchAndRender();
+  }, 600);
+}
+document.getElementById('date-from').addEventListener('input', onDateChange);
+document.getElementById('date-to').addEventListener('input', onDateChange);
+
+document.getElementById('period-presets').addEventListener('click', e => {
+  const btn = e.target.closest('.preset');
+  if (!btn) return;
+  const isActive = btn.classList.contains('active');
+  document.querySelectorAll('.preset').forEach(p => p.classList.remove('active'));
+  if (isActive) {
+    document.getElementById('date-from').value = '';
+    document.getElementById('date-to').value   = '';
+    state.dateFrom = state.dateTo = '';
+  } else {
+    btn.classList.add('active');
+    document.getElementById('date-from').value = btn.dataset.from;
+    document.getElementById('date-to').value   = btn.dataset.to;
+    state.dateFrom = btn.dataset.from;
+    state.dateTo   = btn.dataset.to;
+  }
+  fetchAndRender();
+});
+
+document.getElementById('sort-select').addEventListener('change', e => {
+  state.sort = e.target.value;
+  fetchAndRender();
+});
+
+loadMoreBtn.addEventListener('click', () => { if (!state.loading) fetchAndRender(true); });
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+  state.q = ''; state.form = ''; state.origin = ''; state.dept = '';
+  state.dateFrom = ''; state.dateTo = ''; state.sort = 'date_asc';
+  document.getElementById('search-input').value = '';
+  document.getElementById('date-from').value    = '';
+  document.getElementById('date-to').value      = '';
+  document.getElementById('sort-select').value  = 'date_asc';
+  document.getElementById('dept-select').value  = '';
+  document.getElementById('origin-select').value = '';
+  document.querySelectorAll('#form-chips .chip').forEach(c => c.classList.toggle('active', c.dataset.form === ''));
+  document.querySelectorAll('.preset').forEach(p => p.classList.remove('active'));
+  fetchAndRender();
+});
+
+document.getElementById('detail-close').addEventListener('click', closeDetail);
+document.getElementById('detail-footer-close').addEventListener('click', closeDetail);
+document.getElementById('detail-img').addEventListener('click', () => {
+  const url = document.getElementById('detail-footer-link').href;
+  if (url && url !== '#') window.open(url, '_blank');
+});
+overlay.addEventListener('click', closeDetail);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+loadOrigins();
+fetchAndRender();
+</script>
+</body>
+</html>
