@@ -5,6 +5,8 @@
  * D1 binding: AIC_DB (database: chicago-furniture)
  * Pattern: mirrors cleveland-collection Worker
  *
+ * Authentication: Bearer JWT required (HS256, shared secret with WordPress Simple-JWT-Login)
+ *
  * Key difference from Cleveland: images are IIIF — image_id stored in D1,
  * URLs derived here:
  *   Thumb: https://www.artic.edu/iiif/2/{image_id}/full/400,/0/default.jpg
@@ -41,22 +43,97 @@ function addImageUrls(row) {
   return row;
 }
 
-function jsonResponse(data, status = 200) {
+// ─── CORS Configuration ──────────────────────────────────────────────────────
+
+const ALLOWED_ORIGINS = [
+  'https://sapfm-bench.pages.dev',
+  'https://bench.sapfm.org',
+  'https://sapfm.org',
+  'https://www.sapfm.org',
+  'https://gallery.sapfm.org',
+];
+
+function getAllowedOrigin(request) {
+  const origin = request.headers.get('Origin') ?? '';
+  if (ALLOWED_ORIGINS.includes(origin)) return origin;
+  if (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) return origin;
+  return ALLOWED_ORIGINS[0];
+}
+
+function corsHeaders(request) {
+  return {
+    'Access-Control-Allow-Origin': getAllowedOrigin(request),
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  };
+}
+
+// ─── JWT Verification (HS256, Web Crypto) ────────────────────────────────────
+
+function base64UrlDecode(str) {
+  const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = base64.length % 4 === 0 ? '' : '='.repeat(4 - (base64.length % 4));
+  const binary = atob(base64 + pad);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+async function verifyJWT(request, env) {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  const token = authHeader.slice(7);
+
+  if (env.DEV_BYPASS && token === 'DEV') {
+    return { user_id: 1, dev: true };
+  }
+
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  const [headerB64, payloadB64, signatureB64] = parts;
+
+  try {
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(env.JWT_SECRET),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
+    const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
+    const signature = base64UrlDecode(signatureB64);
+    const valid = await crypto.subtle.verify('HMAC', key, signature, data);
+    if (!valid) return null;
+
+    const payload = JSON.parse(new TextDecoder().decode(base64UrlDecode(payloadB64)));
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
+
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Response helpers ─────────────────────────────────────────────────────────
+
+function jsonResponse(data, cors, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
-      'Content-Type':                'application/json',
-      'Access-Control-Allow-Origin': '*',
-      'Cache-Control':               'public, max-age=300',
+      'Content-Type':  'application/json',
+      'Cache-Control': 'public, max-age=300',
+      ...cors,
     },
   });
 }
 
-function errorResponse(msg, status = 500) {
-  return jsonResponse({ error: msg }, status);
+function errorResponse(msg, cors, status = 500) {
+  return jsonResponse({ error: msg }, cors, status);
 }
 
-async function handleSearch(request, env) {
+// ─── Handlers ─────────────────────────────────────────────────────────────────
+
+async function handleSearch(request, env, cors) {
   const p      = Object.fromEntries(new URL(request.url).searchParams);
   const limit  = Math.min(MAX_LIMIT, Math.max(1, parseInt(p.limit)  || DEFAULT_LIMIT));
   const offset = Math.max(0, parseInt(p.offset) || 0);
@@ -142,13 +219,13 @@ async function handleSearch(request, env) {
       offset,
       limit,
       results,
-    });
+    }, cors);
   } catch (err) {
-    return errorResponse(`Search failed: ${err.message}`);
+    return errorResponse(`Search failed: ${err.message}`, cors);
   }
 }
 
-async function handleCounts(env) {
+async function handleCounts(env, cors) {
   try {
     const [formResult, originResult, deptResult, totals] = await Promise.all([
       env.AIC_DB.prepare(`
@@ -195,13 +272,13 @@ async function handleCounts(env) {
       by_form,
       by_origin,
       by_department,
-    });
+    }, cors);
   } catch (err) {
-    return errorResponse(`Counts failed: ${err.message}`);
+    return errorResponse(`Counts failed: ${err.message}`, cors);
   }
 }
 
-async function handleHealth(env) {
+async function handleHealth(env, cors) {
   try {
     const result = await env.AIC_DB.prepare(
       'SELECT COUNT(*) as n FROM furniture'
@@ -211,29 +288,35 @@ async function handleHealth(env) {
       version: VERSION,
       db:      'chicago-furniture',
       objects: result?.n ?? 0,
-    });
+    }, cors);
   } catch (err) {
-    return errorResponse(`Health check failed: ${err.message}`);
+    return errorResponse(`Health check failed: ${err.message}`, cors);
   }
 }
 
+// ─── Router ───────────────────────────────────────────────────────────────────
+
 export default {
   async fetch(request, env) {
+    const cors = corsHeaders(request);
     const { pathname } = new URL(request.url);
 
     if (request.method === 'OPTIONS') {
-      return new Response(null, {
-        headers: {
-          'Access-Control-Allow-Origin':  '*',
-          'Access-Control-Allow-Methods': 'GET, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-      });
+      return new Response(null, { headers: cors });
     }
 
-    if (pathname === '/search') return handleSearch(request, env);
-    if (pathname === '/counts') return handleCounts(env);
-    if (pathname === '/health') return handleHealth(env);
+    // --- Authentication ---
+    const payload = await verifyJWT(request, env);
+    if (!payload) {
+      return jsonResponse({
+        error: 'Authentication required',
+        login: 'https://sapfm-bench.pages.dev'
+      }, cors, 401);
+    }
+
+    if (pathname === '/search') return handleSearch(request, env, cors);
+    if (pathname === '/counts') return handleCounts(env, cors);
+    if (pathname === '/health') return handleHealth(env, cors);
 
     return jsonResponse({
       worker:    'chicago-collection v1',
@@ -251,6 +334,6 @@ export default {
           '&limit=50&offset=0',
         ].join(' '),
       },
-    });
+    }, cors);
   },
 };
